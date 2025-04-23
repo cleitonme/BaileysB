@@ -1,5 +1,6 @@
 import { promisify } from 'util'
 import { inflate } from 'zlib'
+import logger from '../Utils/logger'
 import * as constants from './constants'
 import { jidEncode } from './jid-utils'
 import type { BinaryNode, BinaryNodeCodingOptions } from './types'
@@ -81,14 +82,14 @@ export const decodeDecompressedBinaryNode = (
 		}
 
 		switch (value) {
-		case 10:
-			return '-'.charCodeAt(0)
-		case 11:
-			return '.'.charCodeAt(0)
-		case 15:
-			return '\0'.charCodeAt(0)
-		default:
-			throw new Error('invalid nibble: ' + value)
+			case 10:
+				return '-'.charCodeAt(0)
+			case 11:
+				return '.'.charCodeAt(0)
+			case 15:
+				return '\0'.charCodeAt(0)
+			default:
+				throw new Error('invalid nibble: ' + value)
 		}
 	}
 
@@ -125,14 +126,14 @@ export const decodeDecompressedBinaryNode = (
 
 	const readListSize = (tag: number) => {
 		switch (tag) {
-		case TAGS.LIST_EMPTY:
-			return 0
-		case TAGS.LIST_8:
-			return readByte()
-		case TAGS.LIST_16:
-			return readInt(2)
-		default:
-			throw new Error('invalid tag for list size: ' + tag)
+			case TAGS.LIST_EMPTY:
+				return 0
+			case TAGS.LIST_8:
+				return readByte()
+			case TAGS.LIST_16:
+				return readInt(2)
+			default:
+				throw new Error('invalid tag for list size: ' + tag)
 		}
 	}
 
@@ -147,11 +148,23 @@ export const decodeDecompressedBinaryNode = (
 	}
 
 	const readAdJid = () => {
-		const agent = readByte()
+		const rawDomainType = readByte()
+		const domainType = Number(rawDomainType)
+
 		const device = readByte()
 		const user = readString(readByte())
 
-		return jidEncode(user, agent === 0 ? 's.whatsapp.net' : 'lid', device)
+		if((domainType & 1) !== 0 || (domainType & 0x80) === 0) {
+			if(![0, 1].includes(domainType)) {
+				logger.warn('Possibly invalid domainType:', domainType, user, device)
+			}
+		}
+
+		return jidEncode(
+			user,
+			domainType === 0 || domainType === 128 ? 's.whatsapp.net' : 'lid',
+			device
+		)
 	}
 
 	const readString = (tag: number): string => {
@@ -160,28 +173,28 @@ export const decodeDecompressedBinaryNode = (
 		}
 
 		switch (tag) {
-		case TAGS.DICTIONARY_0:
-		case TAGS.DICTIONARY_1:
-		case TAGS.DICTIONARY_2:
-		case TAGS.DICTIONARY_3:
-			return getTokenDouble(tag - TAGS.DICTIONARY_0, readByte())
-		case TAGS.LIST_EMPTY:
-			return ''
-		case TAGS.BINARY_8:
-			return readStringFromChars(readByte())
-		case TAGS.BINARY_20:
-			return readStringFromChars(readInt20())
-		case TAGS.BINARY_32:
-			return readStringFromChars(readInt(4))
-		case TAGS.JID_PAIR:
-			return readJidPair()
-		case TAGS.AD_JID:
-			return readAdJid()
-		case TAGS.HEX_8:
-		case TAGS.NIBBLE_8:
-			return readPacked8(tag)
-		default:
-			throw new Error('invalid string with tag: ' + tag)
+			case TAGS.DICTIONARY_0:
+			case TAGS.DICTIONARY_1:
+			case TAGS.DICTIONARY_2:
+			case TAGS.DICTIONARY_3:
+				return getTokenDouble(tag - TAGS.DICTIONARY_0, readByte())
+			case TAGS.LIST_EMPTY:
+				return ''
+			case TAGS.BINARY_8:
+				return readStringFromChars(readByte())
+			case TAGS.BINARY_20:
+				return readStringFromChars(readInt20())
+			case TAGS.BINARY_32:
+				return readStringFromChars(readInt(4))
+			case TAGS.JID_PAIR:
+				return readJidPair()
+			case TAGS.AD_JID:
+				return readAdJid()
+			case TAGS.HEX_8:
+			case TAGS.NIBBLE_8:
+				return readPacked8(tag)
+			default:
+				throw new Error('invalid string with tag: ' + tag)
 		}
 	}
 
@@ -237,18 +250,18 @@ export const decodeDecompressedBinaryNode = (
 		} else {
 			let decoded: Buffer | string
 			switch (tag) {
-			case TAGS.BINARY_8:
-				decoded = readBytes(readByte())
-				break
-			case TAGS.BINARY_20:
-				decoded = readBytes(readInt20())
-				break
-			case TAGS.BINARY_32:
-				decoded = readBytes(readInt(4))
-				break
-			default:
-				decoded = readString(tag)
-				break
+				case TAGS.BINARY_8:
+					decoded = readBytes(readByte())
+					break
+				case TAGS.BINARY_20:
+					decoded = readBytes(readInt20())
+					break
+				case TAGS.BINARY_32:
+					decoded = readBytes(readInt(4))
+					break
+				default:
+					decoded = readString(tag)
+					break
 			}
 
 			data = decoded
