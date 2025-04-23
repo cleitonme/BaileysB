@@ -8,6 +8,6 @@ const makeWASocket = (config: UserFacingSocketConfig) => (
 		...DEFAULT_CONNECTION_CONFIG,
 		...config
 	})
-)
+) as any;
 
 export default makeWASocket

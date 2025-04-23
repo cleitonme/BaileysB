@@ -4,7 +4,7 @@ import { BinaryNode, jidNormalizedUser, S_WHATSAPP_NET } from '../WABinary'
 import { getBinaryNodeChild } from '../WABinary/generic-utils'
 import { makeMessagesRecvSocket } from './messages-recv'
 
-export const makeBusinessSocket = (config: SocketConfig) => {
+export const makeBusinessSocket: any = (config: SocketConfig) => {
 	const sock = makeMessagesRecvSocket(config)
 	const {
 		authState,
