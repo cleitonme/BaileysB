@@ -721,6 +721,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			ids.push(...items.map(i => i.attrs.id))
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
@@ -783,7 +784,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				)
 			])
 		} finally {
-			await sendMessageAck(node)
+			// await sendMessageAck(node)
 		}
 	}
 
@@ -795,6 +796,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			return
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
@@ -819,7 +821,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				)
 			])
 		} finally {
-			await sendMessageAck(node)
+			// await sendMessageAck(node)
 		}
 	}
 
@@ -873,6 +875,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			ev.emit('chats.phoneNumberShare', { lid: node.attrs.from, jid: node.attrs.sender_pn })
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
