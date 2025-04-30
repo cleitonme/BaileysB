@@ -878,6 +878,11 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				processingMutex.mutex(
 					async() => {
 						await decrypt()
+
+						cleanMessage(msg, authState.creds.me!.id)
+
+						await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
+
 						// message failed to decrypt
 						if(msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT) {
 						  if(msg?.messageStubParameters?.[0] === MISSING_KEYS_ERROR_TEXT) {
@@ -926,12 +931,6 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 								await sendReceipt(jid, undefined, [msg.key.id!], 'hist_sync')
 							}
 						}
-
-						cleanMessage(msg, authState.creds.me!.id)
-
-						await sendMessageAck(node)
-
-						await upsertMessage(msg, node.attrs.offline ? 'append' : 'notify')
 					}
 				)
 			])
