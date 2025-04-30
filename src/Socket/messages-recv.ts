@@ -112,7 +112,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		}
 
 		if(!!errorCode) {
-		  stanza.attrs.error = errorCode.toString()
+			stanza.attrs.error = errorCode.toString()
 		}
 
 		if(!!attrs.participant) {
@@ -206,12 +206,12 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				to: toJid,
 			},
 			content: [{
-			    tag: 'terminate',
-			    attrs: {
+				tag: 'terminate',
+				attrs: {
 					'call-id': callId,
 					'call-creator': toJid,
-			    },
-			    content: undefined,
+				},
+				content: undefined,
 			}],
 		})
 		await query(stanza)
@@ -226,13 +226,13 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				from: authState.creds.me!.id,
 			},
 			content: [{
-			    tag: 'reject',
-			    attrs: {
+				tag: 'reject',
+				attrs: {
 					'call-id': callId,
 					'call-creator': callFrom,
 					count: '0',
-			    },
-			    content: undefined,
+				},
+				content: undefined,
 			}],
 		})
 		await query(stanza)
@@ -357,106 +357,106 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 	) => {
 		const participantJid = getBinaryNodeChild(child, 'participant')?.attrs?.jid || participant
 		switch (child?.tag) {
-		case 'create':
-			const metadata = extractGroupMetadata(child)
+			case 'create':
+				const metadata = extractGroupMetadata(child)
 
-			msg.messageStubType = WAMessageStubType.GROUP_CREATE
-			msg.messageStubParameters = [metadata.subject]
-			msg.key = { participant: metadata.owner }
+				msg.messageStubType = WAMessageStubType.GROUP_CREATE
+				msg.messageStubParameters = [metadata.subject]
+				msg.key = { participant: metadata.owner }
 
-			ev.emit('chats.upsert', [{
-				id: metadata.id,
-				name: metadata.subject,
-				conversationTimestamp: metadata.creation,
-			}])
-			ev.emit('groups.upsert', [{
-				...metadata,
-				author: participant
-			}])
-			break
-		case 'ephemeral':
-		case 'not_ephemeral':
-			msg.message = {
-				protocolMessage: {
-					type: proto.Message.ProtocolMessage.Type.EPHEMERAL_SETTING,
-					ephemeralExpiration: +(child.attrs.expiration || 0)
+				ev.emit('chats.upsert', [{
+					id: metadata.id,
+					name: metadata.subject,
+					conversationTimestamp: metadata.creation,
+				}])
+				ev.emit('groups.upsert', [{
+					...metadata,
+					author: participant
+				}])
+				break
+			case 'ephemeral':
+			case 'not_ephemeral':
+				msg.message = {
+					protocolMessage: {
+						type: proto.Message.ProtocolMessage.Type.EPHEMERAL_SETTING,
+						ephemeralExpiration: +(child.attrs.expiration || 0)
+					}
 				}
-			}
-			break
-		case 'modify':
-			const oldNumber = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
-			msg.messageStubParameters = oldNumber || []
-			msg.messageStubType = WAMessageStubType.GROUP_PARTICIPANT_CHANGE_NUMBER
-			break
-		case 'promote':
-		case 'demote':
-		case 'remove':
-		case 'add':
-		case 'leave':
-			const stubType = `GROUP_PARTICIPANT_${child.tag.toUpperCase()}`
-			msg.messageStubType = WAMessageStubType[stubType]
+				break
+			case 'modify':
+				const oldNumber = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
+				msg.messageStubParameters = oldNumber || []
+				msg.messageStubType = WAMessageStubType.GROUP_PARTICIPANT_CHANGE_NUMBER
+				break
+			case 'promote':
+			case 'demote':
+			case 'remove':
+			case 'add':
+			case 'leave':
+				const stubType = `GROUP_PARTICIPANT_${child.tag.toUpperCase()}`
+				msg.messageStubType = WAMessageStubType[stubType]
 
-			const participants = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
-			if(
-				participants.length === 1 &&
+				const participants = getBinaryNodeChildren(child, 'participant').map(p => p.attrs.jid)
+				if(
+					participants.length === 1 &&
 					// if recv. "remove" message and sender removed themselves
 					// mark as left
 					areJidsSameUser(participants[0], participant) &&
 					child.tag === 'remove'
-			) {
-				msg.messageStubType = WAMessageStubType.GROUP_PARTICIPANT_LEAVE
-			}
+				) {
+					msg.messageStubType = WAMessageStubType.GROUP_PARTICIPANT_LEAVE
+				}
 
-			msg.messageStubParameters = participants
-			break
-		case 'subject':
-			msg.messageStubType = WAMessageStubType.GROUP_CHANGE_SUBJECT
-			msg.messageStubParameters = [ child.attrs.subject ]
-			break
-		case 'description':
-			const description = getBinaryNodeChild(child, 'body')?.content?.toString()
-			msg.messageStubType = WAMessageStubType.GROUP_CHANGE_DESCRIPTION
-			msg.messageStubParameters = description ? [ description ] : undefined
-			break
-		case 'announcement':
-		case 'not_announcement':
-			msg.messageStubType = WAMessageStubType.GROUP_CHANGE_ANNOUNCE
-			msg.messageStubParameters = [ (child.tag === 'announcement') ? 'on' : 'off' ]
-			break
-		case 'locked':
-		case 'unlocked':
-			msg.messageStubType = WAMessageStubType.GROUP_CHANGE_RESTRICT
-			msg.messageStubParameters = [ (child.tag === 'locked') ? 'on' : 'off' ]
-			break
-		case 'invite':
-			msg.messageStubType = WAMessageStubType.GROUP_CHANGE_INVITE_LINK
-			msg.messageStubParameters = [ child.attrs.code ]
-			break
-		case 'member_add_mode':
-			const addMode = child.content
-			if(addMode) {
-				msg.messageStubType = WAMessageStubType.GROUP_MEMBER_ADD_MODE
-				msg.messageStubParameters = [ addMode.toString() ]
-			}
+				msg.messageStubParameters = participants
+				break
+			case 'subject':
+				msg.messageStubType = WAMessageStubType.GROUP_CHANGE_SUBJECT
+				msg.messageStubParameters = [ child.attrs.subject ]
+				break
+			case 'description':
+				const description = getBinaryNodeChild(child, 'body')?.content?.toString()
+				msg.messageStubType = WAMessageStubType.GROUP_CHANGE_DESCRIPTION
+				msg.messageStubParameters = description ? [ description ] : undefined
+				break
+			case 'announcement':
+			case 'not_announcement':
+				msg.messageStubType = WAMessageStubType.GROUP_CHANGE_ANNOUNCE
+				msg.messageStubParameters = [ (child.tag === 'announcement') ? 'on' : 'off' ]
+				break
+			case 'locked':
+			case 'unlocked':
+				msg.messageStubType = WAMessageStubType.GROUP_CHANGE_RESTRICT
+				msg.messageStubParameters = [ (child.tag === 'locked') ? 'on' : 'off' ]
+				break
+			case 'invite':
+				msg.messageStubType = WAMessageStubType.GROUP_CHANGE_INVITE_LINK
+				msg.messageStubParameters = [ child.attrs.code ]
+				break
+			case 'member_add_mode':
+				const addMode = child.content
+				if(addMode) {
+					msg.messageStubType = WAMessageStubType.GROUP_MEMBER_ADD_MODE
+					msg.messageStubParameters = [ addMode.toString() ]
+				}
 
-			break
-		case 'membership_approval_mode':
-			const approvalMode = getBinaryNodeChild(child, 'group_join')
-			if(approvalMode) {
-				msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_MODE
-				msg.messageStubParameters = [ approvalMode.attrs.state ]
-			}
+				break
+			case 'membership_approval_mode':
+				const approvalMode = getBinaryNodeChild(child, 'group_join')
+				if(approvalMode) {
+					msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_MODE
+					msg.messageStubParameters = [ approvalMode.attrs.state ]
+				}
 
-			break
-		case 'created_membership_requests':
-			msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_REQUEST_NON_ADMIN_ADD
-			msg.messageStubParameters = [ participantJid, 'created', child.attrs.request_method ]
-			break
-		case 'revoked_membership_requests':
-			const isDenied = areJidsSameUser(participantJid, participant)
-			msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_REQUEST_NON_ADMIN_ADD
-			msg.messageStubParameters = [ participantJid, isDenied ? 'revoked' : 'rejected' ]
-			break
+				break
+			case 'created_membership_requests':
+				msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_REQUEST_NON_ADMIN_ADD
+				msg.messageStubParameters = [ participantJid, 'created', child.attrs.request_method ]
+				break
+			case 'revoked_membership_requests':
+				const isDenied = areJidsSameUser(participantJid, participant)
+				msg.messageStubType = WAMessageStubType.GROUP_MEMBERSHIP_JOIN_APPROVAL_REQUEST_NON_ADMIN_ADD
+				msg.messageStubParameters = [ participantJid, isDenied ? 'revoked' : 'rejected' ]
+				break
 		}
 	}
 
@@ -467,156 +467,156 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		const from = jidNormalizedUser(node.attrs.from)
 
 		switch (nodeType) {
-		case 'privacy_token':
-			const tokenList = getBinaryNodeChildren(child, 'token')
-			for(const { attrs, content } of tokenList) {
-				const jid = attrs.jid
-				ev.emit('chats.update', [
-					{
-						id: jid,
-						tcToken: content as Buffer
-					}
-				])
+			case 'privacy_token':
+				const tokenList = getBinaryNodeChildren(child, 'token')
+				for(const { attrs, content } of tokenList) {
+					const jid = attrs.jid
+					ev.emit('chats.update', [
+						{
+							id: jid,
+							tcToken: content as Buffer
+						}
+					])
 
-				logger.debug({ jid }, 'got privacy token update')
-			}
-
-			break
-		case 'w:gp2':
-			handleGroupNotification(node.attrs.participant, child, result)
-			break
-		case 'mediaretry':
-			const event = decodeMediaRetryNode(node)
-			ev.emit('messages.media-update', [event])
-			break
-		case 'encrypt':
-			await handleEncryptNotification(node)
-			break
-		case 'devices':
-			const devices = getBinaryNodeChildren(child, 'device')
-			if(areJidsSameUser(child.attrs.jid, authState.creds.me!.id)) {
-				const deviceJids = devices.map(d => d.attrs.jid)
-				logger.info({ deviceJids }, 'got my own devices')
-			}
-
-			break
-		case 'server_sync':
-			const update = getBinaryNodeChild(node, 'collection')
-			if(update) {
-				const name = update.attrs.name as WAPatchName
-				await resyncAppState([name], false)
-			}
-
-			break
-		case 'picture':
-			const setPicture = getBinaryNodeChild(node, 'set')
-			const delPicture = getBinaryNodeChild(node, 'delete')
-
-			ev.emit('contacts.update', [{
-				id: jidNormalizedUser(node?.attrs?.from) || ((setPicture || delPicture)?.attrs?.hash) || '',
-				imgUrl: setPicture ? 'changed' : 'removed'
-			}])
-
-			if(isJidGroup(from)) {
-				const node = setPicture || delPicture
-				result.messageStubType = WAMessageStubType.GROUP_CHANGE_ICON
-
-				if(setPicture) {
-					result.messageStubParameters = [setPicture.attrs.id]
+					logger.debug({ jid }, 'got privacy token update')
 				}
 
-				result.participant = node?.attrs.author
-				result.key = {
-					...result.key || {},
-					participant: setPicture?.attrs.author
+				break
+			case 'w:gp2':
+				handleGroupNotification(node.attrs.participant, child, result)
+				break
+			case 'mediaretry':
+				const event = decodeMediaRetryNode(node)
+				ev.emit('messages.media-update', [event])
+				break
+			case 'encrypt':
+				await handleEncryptNotification(node)
+				break
+			case 'devices':
+				const devices = getBinaryNodeChildren(child, 'device')
+				if(areJidsSameUser(child.attrs.jid, authState.creds.me!.id)) {
+					const deviceJids = devices.map(d => d.attrs.jid)
+					logger.info({ deviceJids }, 'got my own devices')
 				}
-			}
 
-			break
-		case 'account_sync':
-			if(child.tag === 'disappearing_mode') {
-				const newDuration = +child.attrs.duration
-				const timestamp = +child.attrs.t
+				break
+			case 'server_sync':
+				const update = getBinaryNodeChild(node, 'collection')
+				if(update) {
+					const name = update.attrs.name as WAPatchName
+					await resyncAppState([name], false)
+				}
 
-				logger.info({ newDuration }, 'updated account disappearing mode')
+				break
+			case 'picture':
+				const setPicture = getBinaryNodeChild(node, 'set')
+				const delPicture = getBinaryNodeChild(node, 'delete')
 
-				ev.emit('creds.update', {
-					accountSettings: {
-						...authState.creds.accountSettings,
-						defaultDisappearingMode: {
-							ephemeralExpiration: newDuration,
-							ephemeralSettingTimestamp: timestamp,
-						},
+				ev.emit('contacts.update', [{
+					id: jidNormalizedUser(node?.attrs?.from) || ((setPicture || delPicture)?.attrs?.hash) || '',
+					imgUrl: setPicture ? 'changed' : 'removed'
+				}])
+
+				if(isJidGroup(from)) {
+					const node = setPicture || delPicture
+					result.messageStubType = WAMessageStubType.GROUP_CHANGE_ICON
+
+					if(setPicture) {
+						result.messageStubParameters = [setPicture.attrs.id]
 					}
+
+					result.participant = node?.attrs.author
+					result.key = {
+						...result.key || {},
+						participant: setPicture?.attrs.author
+					}
+				}
+
+				break
+			case 'account_sync':
+				if(child.tag === 'disappearing_mode') {
+					const newDuration = +child.attrs.duration
+					const timestamp = +child.attrs.t
+
+					logger.info({ newDuration }, 'updated account disappearing mode')
+
+					ev.emit('creds.update', {
+						accountSettings: {
+							...authState.creds.accountSettings,
+							defaultDisappearingMode: {
+								ephemeralExpiration: newDuration,
+								ephemeralSettingTimestamp: timestamp,
+							},
+						}
+					})
+				} else if(child.tag === 'blocklist') {
+					const blocklists = getBinaryNodeChildren(child, 'item')
+
+					for(const { attrs } of blocklists) {
+						const blocklist = [attrs.jid]
+						const type = (attrs.action === 'block') ? 'add' : 'remove'
+						ev.emit('blocklist.update', { blocklist, type })
+					}
+				}
+
+				break
+			case 'link_code_companion_reg':
+				const linkCodeCompanionReg = getBinaryNodeChild(node, 'link_code_companion_reg')
+				const ref = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'link_code_pairing_ref'))
+				const primaryIdentityPublicKey = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'primary_identity_pub'))
+				const primaryEphemeralPublicKeyWrapped = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'link_code_pairing_wrapped_primary_ephemeral_pub'))
+				const codePairingPublicKey = await decipherLinkPublicKey(primaryEphemeralPublicKeyWrapped)
+				const companionSharedKey = Curve.sharedKey(authState.creds.pairingEphemeralKeyPair.private, codePairingPublicKey)
+				const random = randomBytes(32)
+				const linkCodeSalt = randomBytes(32)
+				const linkCodePairingExpanded = await hkdf(companionSharedKey, 32, {
+					salt: linkCodeSalt,
+					info: 'link_code_pairing_key_bundle_encryption_key'
 				})
-			} else if(child.tag === 'blocklist') {
-				const blocklists = getBinaryNodeChildren(child, 'item')
-
-				for(const { attrs } of blocklists) {
-					const blocklist = [attrs.jid]
-					const type = (attrs.action === 'block') ? 'add' : 'remove'
-					ev.emit('blocklist.update', { blocklist, type })
-				}
-			}
-
-			break
-		case 'link_code_companion_reg':
-			const linkCodeCompanionReg = getBinaryNodeChild(node, 'link_code_companion_reg')
-			const ref = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'link_code_pairing_ref'))
-			const primaryIdentityPublicKey = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'primary_identity_pub'))
-			const primaryEphemeralPublicKeyWrapped = toRequiredBuffer(getBinaryNodeChildBuffer(linkCodeCompanionReg, 'link_code_pairing_wrapped_primary_ephemeral_pub'))
-			const codePairingPublicKey = await decipherLinkPublicKey(primaryEphemeralPublicKeyWrapped)
-			const companionSharedKey = Curve.sharedKey(authState.creds.pairingEphemeralKeyPair.private, codePairingPublicKey)
-			const random = randomBytes(32)
-			const linkCodeSalt = randomBytes(32)
-			const linkCodePairingExpanded = await hkdf(companionSharedKey, 32, {
-				salt: linkCodeSalt,
-				info: 'link_code_pairing_key_bundle_encryption_key'
-			})
-			const encryptPayload = Buffer.concat([Buffer.from(authState.creds.signedIdentityKey.public), primaryIdentityPublicKey, random])
-			const encryptIv = randomBytes(12)
-			const encrypted = aesEncryptGCM(encryptPayload, linkCodePairingExpanded, encryptIv, Buffer.alloc(0))
-			const encryptedPayload = Buffer.concat([linkCodeSalt, encryptIv, encrypted])
-			const identitySharedKey = Curve.sharedKey(authState.creds.signedIdentityKey.private, primaryIdentityPublicKey)
-			const identityPayload = Buffer.concat([companionSharedKey, identitySharedKey, random])
-			authState.creds.advSecretKey = (await hkdf(identityPayload, 32, { info: 'adv_secret' })).toString('base64')
-			await query({
-				tag: 'iq',
-				attrs: {
-					to: S_WHATSAPP_NET,
-					type: 'set',
-					id: sock.generateMessageTag(),
-					xmlns: 'md'
-				},
-				content: [
-					{
-						tag: 'link_code_companion_reg',
-						attrs: {
-							jid: authState.creds.me!.id,
-							stage: 'companion_finish',
-						},
-						content: [
-							{
-								tag: 'link_code_pairing_wrapped_key_bundle',
-								attrs: {},
-								content: encryptedPayload
+				const encryptPayload = Buffer.concat([Buffer.from(authState.creds.signedIdentityKey.public), primaryIdentityPublicKey, random])
+				const encryptIv = randomBytes(12)
+				const encrypted = aesEncryptGCM(encryptPayload, linkCodePairingExpanded, encryptIv, Buffer.alloc(0))
+				const encryptedPayload = Buffer.concat([linkCodeSalt, encryptIv, encrypted])
+				const identitySharedKey = Curve.sharedKey(authState.creds.signedIdentityKey.private, primaryIdentityPublicKey)
+				const identityPayload = Buffer.concat([companionSharedKey, identitySharedKey, random])
+				authState.creds.advSecretKey = (await hkdf(identityPayload, 32, { info: 'adv_secret' })).toString('base64')
+				await query({
+					tag: 'iq',
+					attrs: {
+						to: S_WHATSAPP_NET,
+						type: 'set',
+						id: sock.generateMessageTag(),
+						xmlns: 'md'
+					},
+					content: [
+						{
+							tag: 'link_code_companion_reg',
+							attrs: {
+								jid: authState.creds.me!.id,
+								stage: 'companion_finish',
 							},
-							{
-								tag: 'companion_identity_public',
-								attrs: {},
-								content: authState.creds.signedIdentityKey.public
-							},
-							{
-								tag: 'link_code_pairing_ref',
-								attrs: {},
-								content: ref
-							}
-						]
-					}
-				]
-			})
-			authState.creds.registered = true
-			ev.emit('creds.update', authState.creds)
+							content: [
+								{
+									tag: 'link_code_pairing_wrapped_key_bundle',
+									attrs: {},
+									content: encryptedPayload
+								},
+								{
+									tag: 'companion_identity_public',
+									attrs: {},
+									content: authState.creds.signedIdentityKey.public
+								},
+								{
+									tag: 'link_code_pairing_ref',
+									attrs: {},
+									content: ref
+								}
+							]
+						}
+					]
+				})
+				authState.creds.registered = true
+				ev.emit('creds.update', authState.creds)
 		}
 
 		if(Object.keys(result).length) {
@@ -658,7 +658,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 		ids: string[],
 		retryNode: BinaryNode
 	) => {
-	  // todo: implement a cache to store the last 256 sent messages (copy whatsmeow)
+		// todo: implement a cache to store the last 256 sent messages (copy whatsmeow)
 		const msgs = await Promise.all(ids.map(id => getMessage({ ...key, id })))
 		const remoteJid = key.remoteJid!
 		const participant = key.participant || remoteJid
@@ -721,6 +721,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			ids.push(...items.map(i => i.attrs.id))
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
@@ -783,7 +784,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				)
 			])
 		} finally {
-			await sendMessageAck(node)
+			// await sendMessageAck(node)
 		}
 	}
 
@@ -795,6 +796,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			return
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
@@ -819,7 +821,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 				)
 			])
 		} finally {
-			await sendMessageAck(node)
+			// await sendMessageAck(node)
 		}
 	}
 
@@ -834,9 +836,9 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 		// TODO: temporary fix for crashes and issues resulting of failed msmsg decryption
 		if(encNode && encNode.attrs.type === 'msmsg') {
-  		logger.debug({ key: node.attrs.key }, 'ignored msmsg')
-  		await sendMessageAck(node)
-  		return
+			logger.debug({ key: node.attrs.key }, 'ignored msmsg')
+			await sendMessageAck(node)
+			return
 		}
 
 		let response: string | undefined
@@ -873,6 +875,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 			ev.emit('chats.phoneNumberShare', { lid: node.attrs.from, jid: node.attrs.sender_pn })
 		}
 
+		await sendMessageAck(node)
 		try {
 			await Promise.all([
 				processingMutex.mutex(
@@ -885,7 +888,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 						// message failed to decrypt
 						if(msg.messageStubType === proto.WebMessageInfo.StubType.CIPHERTEXT) {
-						  if(msg?.messageStubParameters?.[0] === MISSING_KEYS_ERROR_TEXT) {
+							if(msg?.messageStubParameters?.[0] === MISSING_KEYS_ERROR_TEXT) {
 								return sendMessageAck(node, NACK_REASONS.ParsingError)
 							}
 
@@ -931,6 +934,7 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 								await sendReceipt(jid, undefined, [msg.key.id!], 'hist_sync')
 							}
 						}
+
 					}
 				)
 			])
