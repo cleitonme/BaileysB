@@ -258,8 +258,8 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 		if(retryCount === 1) {
 			//request a resend via phone
-			const msgId = await requestPlaceholderResend(msgKey)
-			logger.debug(`sendRetryRequest: requested placeholder resend for message ${msgId}`)
+			const msgResentId = await requestPlaceholderResend(msgKey)
+			logger.debug(`sendRetryRequest: requested placeholder resend for message ${msgId} - ${msgResentId}`)
 		}
 
 		const deviceIdentity = encodeSignedDeviceIdentity(account!, true)
