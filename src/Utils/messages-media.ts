@@ -401,6 +401,10 @@ export const encryptedStream = async(
 		encWriteStream.push(null)
 
 		writeStream?.end()
+		if (writeStream) {
+			// Wait for the 'finish' event, which signifies  that all data has been flushed to the underlying system.
+			await once(writeStream!, 'finish');
+		}
 		stream.destroy()
 
 		logger?.debug('encrypted data successfully')
