@@ -187,7 +187,7 @@ export const makeSocket = (config: SocketConfig) => {
 		let onRecv: (json) => void
 		let onErr: (err) => void
 		try {
-			return await promiseTimeout<T>(timeoutMs,
+			const result = await promiseTimeout<T>(timeoutMs,
 				(resolve, reject) => {
 					onRecv = resolve
 					onErr = err => {
@@ -196,15 +196,15 @@ export const makeSocket = (config: SocketConfig) => {
 
 					ws.on(`TAG:${msgId}`, onRecv)
 					ws.on('close', onErr) // if the socket closes, you'll never receive the message
-					ws.on('error', onErr)
-					ws.on('CB:stream:error', onErr)
+					ws.off('error', onErr)
 				},
 			)
+
+			return result as any
 		} finally {
 			ws.off(`TAG:${msgId}`, onRecv!)
 			ws.off('close', onErr!) // if the socket closes, you'll never receive the message
 			ws.off('error', onErr!)
-			ws.off('CB:stream:error', onErr!)
 		}
 	}
 
@@ -215,11 +215,12 @@ export const makeSocket = (config: SocketConfig) => {
 		}
 
 		const msgId = node.attrs.id
-		const wait = waitForMessage(msgId, timeoutMs)
 
-		await sendNode(node)
+		const [result] = await Promise.all([
+			waitForMessage(msgId, timeoutMs),
+			sendNode(node)
+		])
 
-		const result = await (wait as Promise<BinaryNode>)
 		if('tag' in result) {
 			assertNodeErrorFree(result)
 		}
@@ -370,9 +371,6 @@ export const makeSocket = (config: SocketConfig) => {
 
 		if(!ws.isClosed && !ws.isClosing) {
 			try {
-				ws.on('error', (err) => {
-					logger.error({ err: err })
-				})
 				ws.close()
 			} catch{ }
 		}
@@ -679,7 +677,7 @@ export const makeSocket = (config: SocketConfig) => {
 	})
 
 	ws.on('CB:ib,,offline_preview', (node: BinaryNode) => {
-	  logger.info('offline preview received', JSON.stringify(node))
+		logger.info('offline preview received', JSON.stringify(node))
 		sendNode({
 			tag: 'ib',
 			attrs: {},
