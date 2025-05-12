@@ -1,7 +1,7 @@
 import { Boom } from '@hapi/boom'
 import axios from 'axios'
 import { randomBytes } from 'crypto'
-import { createReadStream, promises as fs } from 'fs'
+import { promises as fs } from 'fs'
 import { type Transform } from 'stream'
 import { proto } from '../../WAProto'
 import { MEDIA_KEYS, URL_REGEX, WA_DEFAULT_EPHEMERAL } from '../Defaults'
@@ -59,7 +59,7 @@ const MessageTypeProto = {
 	'video': WAProto.Message.VideoMessage,
 	'audio': WAProto.Message.AudioMessage,
 	'sticker': WAProto.Message.StickerMessage,
-	'document': WAProto.Message.DocumentMessage,
+   	'document': WAProto.Message.DocumentMessage,
 } as const
 
 const ButtonType = proto.Message.ButtonsMessage.HeaderType
@@ -122,12 +122,12 @@ export const prepareWAMessageMedia = async(
 	delete uploadData[mediaType]
 	// check if cacheable + generate cache key
 	const cacheableKey = typeof uploadData.media === 'object' &&
-		('url' in uploadData.media) &&
-		!!uploadData.media.url &&
-		!!options.mediaCache && (
-			// generate the key
-			mediaType + ':' + uploadData.media.url.toString()
-		)
+			('url' in uploadData.media) &&
+			!!uploadData.media.url &&
+			!!options.mediaCache && (
+	// generate the key
+		mediaType + ':' + uploadData.media.url.toString()
+	)
 
 	if(mediaType === 'document' && !uploadData.fileName) {
 		uploadData.fileName = 'file'
@@ -154,17 +154,18 @@ export const prepareWAMessageMedia = async(
 
 	const requiresDurationComputation = mediaType === 'audio' && typeof uploadData.seconds === 'undefined'
 	const requiresThumbnailComputation = (mediaType === 'image' || mediaType === 'video') &&
-		(typeof uploadData['jpegThumbnail'] === 'undefined')
+										(typeof uploadData['jpegThumbnail'] === 'undefined')
 	const requiresWaveformProcessing = mediaType === 'audio' && uploadData.ptt === true
 	const requiresAudioBackground = options.backgroundColor && mediaType === 'audio' && uploadData.ptt === true
 	const requiresOriginalForSomeProcessing = requiresDurationComputation || requiresThumbnailComputation
 	const {
 		mediaKey,
-		encFilePath,
-		originalFilePath,
+		encWriteStream,
+		bodyPath,
 		fileEncSha256,
 		fileSha256,
-		fileLength
+		fileLength,
+		didSaveToTmpPath
 	} = await encryptedStream(
 		uploadData.media,
 		options.mediaTypeOverride || mediaType,
@@ -174,12 +175,12 @@ export const prepareWAMessageMedia = async(
 			opts: options.options
 		}
 	)
-	// url safe Base64 encode the SHA256 hash of the body
+	 // url safe Base64 encode the SHA256 hash of the body
 	const fileEncSha256B64 = fileEncSha256.toString('base64')
 	const [{ mediaUrl, directPath }] = await Promise.all([
 		(async() => {
 			const result = await options.upload(
-				encFilePath,
+				encWriteStream,
 				{ fileEncSha256B64, mediaType, timeoutMs: options.mediaUploadTimeoutMs }
 			)
 			logger?.debug({ mediaType, cacheableKey }, 'uploaded media')
@@ -191,7 +192,7 @@ export const prepareWAMessageMedia = async(
 					const {
 						thumbnail,
 						originalImageDimensions
-					} = await generateThumbnail(originalFilePath!, mediaType as 'image' | 'video', options)
+					} = await generateThumbnail(bodyPath!, mediaType as 'image' | 'video', options)
 					uploadData.jpegThumbnail = thumbnail
 					if(!uploadData.width && originalImageDimensions) {
 						uploadData.width = originalImageDimensions.width
@@ -203,12 +204,12 @@ export const prepareWAMessageMedia = async(
 				}
 
 				if(requiresDurationComputation) {
-					uploadData.seconds = await getAudioDuration(originalFilePath!)
+					uploadData.seconds = await getAudioDuration(bodyPath!)
 					logger?.debug('computed audio duration')
 				}
 
 				if(requiresWaveformProcessing) {
-					uploadData.waveform = await getAudioWaveform(originalFilePath!, logger)
+					uploadData.waveform = await getAudioWaveform(bodyPath!, logger)
 					logger?.debug('processed waveform')
 				}
 
@@ -223,15 +224,20 @@ export const prepareWAMessageMedia = async(
 	])
 		.finally(
 			async() => {
-				try {
-					await fs.unlink(encFilePath)
-					if(originalFilePath) {
-						await fs.unlink(originalFilePath)
+				encWriteStream.destroy()
+				// remove tmp files
+				if(didSaveToTmpPath && bodyPath) {
+					try {
+						await fs.access(bodyPath)
+						// wait N seconds to give a chance processing finish it's job in case of errors
+						setTimeout(
+							async () => {
+								await fs.unlink(bodyPath)
+								logger?.debug('removed tmp files')
+							}, 5000)
+					} catch(error) {
+						logger?.warn('failed to remove tmp file')
 					}
-
-					logger?.debug('removed tmp files')
-				} catch(error) {
-					logger?.warn('failed to remove tmp file')
 				}
 			}
 		)
@@ -423,20 +429,20 @@ export const generateWAMessageContent = async(
 		m.messageContextInfo.messageAddOnDurationInSecs = message.type === 1 ? message.time || 86400 : 0
 	} else if('buttonReply' in message) {
 		switch (message.type) {
-			case 'template':
-				m.templateButtonReplyMessage = {
-					selectedDisplayText: message.buttonReply.displayText,
-					selectedId: message.buttonReply.id,
-					selectedIndex: message.buttonReply.index,
-				}
-				break
-			case 'plain':
-				m.buttonsResponseMessage = {
-					selectedButtonId: message.buttonReply.id,
-					selectedDisplayText: message.buttonReply.displayText,
-					type: proto.Message.ButtonsResponseMessage.Type.DISPLAY_TEXT,
-				}
-				break
+		case 'template':
+			m.templateButtonReplyMessage = {
+				selectedDisplayText: message.buttonReply.displayText,
+				selectedId: message.buttonReply.id,
+				selectedIndex: message.buttonReply.index,
+			}
+			break
+		case 'plain':
+			m.buttonsResponseMessage = {
+				selectedButtonId: message.buttonReply.id,
+				selectedDisplayText: message.buttonReply.displayText,
+				type: proto.Message.ButtonsResponseMessage.Type.DISPLAY_TEXT,
+			}
+			break
 		}
 	} else if('ptv' in message && message.ptv) {
 		const { videoMessage } = await prepareWAMessageMedia(
@@ -714,32 +720,32 @@ export const getContentType = (content: WAProto.IMessage | undefined) => {
  * @returns
  */
 export const normalizeMessageContent = (content: WAMessageContent | null | undefined): WAMessageContent | undefined => {
-	if(!content) {
-		return undefined
-	}
+	 if(!content) {
+		 return undefined
+	 }
 
-	// set max iterations to prevent an infinite loop
-	for(let i = 0;i < 5;i++) {
-		const inner = getFutureProofMessage(content)
-		if(!inner) {
-			break
-		}
+	 // set max iterations to prevent an infinite loop
+	 for(let i = 0;i < 5;i++) {
+		 const inner = getFutureProofMessage(content)
+		 if(!inner) {
+			 break
+		 }
 
-		content = inner.message
-	}
+		 content = inner.message
+	 }
 
-	return content!
+	 return content!
 
-	function getFutureProofMessage(message: typeof content) {
-		return (
-			message?.ephemeralMessage
-			|| message?.viewOnceMessage
-			|| message?.documentWithCaptionMessage
-			|| message?.viewOnceMessageV2
-			|| message?.viewOnceMessageV2Extension
-			|| message?.editedMessage
-		)
-	}
+	 function getFutureProofMessage(message: typeof content) {
+		 return (
+			 message?.ephemeralMessage
+			 || message?.viewOnceMessage
+			 || message?.documentWithCaptionMessage
+			 || message?.viewOnceMessageV2
+			 || message?.viewOnceMessageV2Extension
+			 || message?.editedMessage
+		 )
+	 }
 }
 
 /**
@@ -769,7 +775,7 @@ export const extractMessageContent = (content: WAMessageContent | undefined | nu
 	content = normalizeMessageContent(content)
 
 	if(content?.buttonsMessage) {
-		return extractFromTemplateMessage(content.buttonsMessage)
+	  return extractFromTemplateMessage(content.buttonsMessage)
 	}
 
 	if(content?.templateMessage?.hydratedFourRowTemplate) {
@@ -927,7 +933,7 @@ export const downloadMediaMessage = async<Type extends 'buffer' | 'stream'>(
 	const result = await downloadMsg()
 		.catch(async(error) => {
 			if(ctx && axios.isAxiosError(error) && // check if the message requires a reupload
-				REUPLOAD_REQUIRED_STATUS.includes(error.response?.status!)) {
+					REUPLOAD_REQUIRED_STATUS.includes(error.response?.status!)) {
 				ctx.logger.info({ key: message.key }, 'sending reupload media request...')
 				// request reupload
 				message = await ctx.reuploadRequest(message)
